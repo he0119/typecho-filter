@@ -19,7 +19,7 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      */
     public static function activate()
     {
-        Typecho_Plugin::factory('Widget_Archive')->indexHandle = array('Filter_Plugin', 'filter');
+        Typecho_Plugin::factory('Widget_Archive')->indexHandle = array('Filter_Plugin', 'indexFilter');
         return _t('插件已激活，现在可以对插件进行设置！');
     }
     /**
@@ -64,8 +64,14 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      * @access public
      * @return void
      */
-    public static function filter($obj, $select)
+    public static function indexFilter($obj, $select)
     {
+        # 获取用户
+        $user = Typecho_Widget::widget('Widget_User');
+        if (!$user->pass('editor', true)) {
+            // 过滤加密文章
+            $select = $select->where('table.contents.password IS NULL');
+        }
         return $select;
     }
 }
