@@ -5,7 +5,7 @@
  *
  * @package Filter
  * @author uy_sun
- * @version 0.1.0
+ * @version 0.1.1
  * @link https://hehome.xyz/
  */
 class Filter_Plugin implements Typecho_Plugin_Interface
@@ -79,6 +79,11 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      */
     public static function recentPosts()
     {
+        # 如果插件未激活则使用 Typecho 自带的组件
+        $options = Typecho_Widget::widget('Widget_Options');
+		if (!isset($options->plugins['activated']['Filter'])) {
+			return Typecho_Widget::widget('Widget_Contents_Post_Recent');
+		}
         return Typecho_Widget::widget('Widget_Contents_Post_Recent_Filter_Plugin');
     }
 
@@ -90,6 +95,11 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      */
     public static function recentComments()
     {
+        # 如果插件未激活则使用 Typecho 自带的组件
+        $options = Typecho_Widget::widget('Widget_Options');
+        if (!isset($options->plugins['activated']['Filter'])) {
+			return Typecho_Widget::widget('Widget_Comments_Recent');
+		}
         return Typecho_Widget::widget('Widget_Comments_Recent_Filter_Plugin');
     }
 }
