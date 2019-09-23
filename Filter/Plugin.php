@@ -1,11 +1,11 @@
 <?php
 
 /**
- * 首页过滤文章，和其评论
+ * 首页过滤文章和评论
  *
  * @package Filter
  * @author uy_sun
- * @version 0.0.2
+ * @version 0.0.3
  * @link https://hehome.xyz/
  */
 class Filter_Plugin implements Typecho_Plugin_Interface
@@ -21,9 +21,9 @@ class Filter_Plugin implements Typecho_Plugin_Interface
     {
         # 过滤加密文章
         Typecho_Plugin::factory('Widget_Archive')->handleInit = array('Filter_Plugin', 'archiveFilter');
-        // TODO: 过滤最新文章处的加密文章和最近回复处加密文章下的评论
-        return _t('插件已激活，现在可以对插件进行设置！');
+        Typecho_Plugin::factory('Widget_Abstract_Comments')->filter = array('Filter_Plugin', 'commentsFilter');
     }
+
     /**
      * 禁用插件方法,如果禁用失败,直接抛出异常
      *
@@ -34,6 +34,7 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      */
     public static function deactivate()
     { }
+
     /**
      * 获取插件配置面板
      *
@@ -43,6 +44,7 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      */
     public static function config(Typecho_Widget_Helper_Form $form)
     { }
+
     /**
      * 个人用户的配置面板
      *
@@ -54,14 +56,7 @@ class Filter_Plugin implements Typecho_Plugin_Interface
     { }
 
     /**
-     * 插件实现方法
-     *
-     * @access public
-     * @return void
-     */
-
-    /**
-     * 插件实现方法
+     * 过滤加密文章
      *
      * @access public
      * @return void
@@ -75,5 +70,28 @@ class Filter_Plugin implements Typecho_Plugin_Interface
             $select = $select->where('table.contents.password IS NULL');
         }
         return $select;
+    }
+
+    /**
+     * 给评论添加 show 属性，加密文章评论的值为 false
+     *
+     * @access public
+     * @return array
+     */
+    public static function commentsFilter($value, $obj)
+    {
+        $value['show'] = true;
+        # 获取用户
+        $user = Typecho_Widget::widget('Widget_User');
+        if (!$user->pass('editor', true)) {
+            $db = Typecho_Db::get();
+            $password = $db->fetchRow($db->select('password')->from('table.contents')->where('table.contents.cid = ?', $value['cid']))['password'];
+            // 过滤加密评论
+            if ($password) {
+                $value['show'] = false;
+                return $value;
+            }
+        }
+        return $value;
     }
 }
