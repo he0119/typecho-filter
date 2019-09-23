@@ -1,11 +1,11 @@
 <?php
 
 /**
- * 首页过滤指定文章，评论
+ * 首页过滤文章，和其评论
  *
  * @package Filter
  * @author uy_sun
- * @version 0.0.1
+ * @version 0.0.2
  * @link https://hehome.xyz/
  */
 class Filter_Plugin implements Typecho_Plugin_Interface
@@ -19,7 +19,9 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      */
     public static function activate()
     {
-        Typecho_Plugin::factory('Widget_Archive')->indexHandle = array('Filter_Plugin', 'indexFilter');
+        # 过滤加密文章
+        Typecho_Plugin::factory('Widget_Archive')->handleInit = array('Filter_Plugin', 'archiveFilter');
+        // TODO: 过滤最新文章处的加密文章和最近回复处加密文章下的评论
         return _t('插件已激活，现在可以对插件进行设置！');
     }
     /**
@@ -64,7 +66,7 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      * @access public
      * @return void
      */
-    public static function indexFilter($obj, $select)
+    public static function archiveFilter($obj, $select)
     {
         # 获取用户
         $user = Typecho_Widget::widget('Widget_User');
