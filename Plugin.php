@@ -1,26 +1,45 @@
 <?php
 
+namespace TypechoPlugin\Filter;
+
+use Typecho\Db;
+use Typecho\Db\Query;
+use Typecho\Plugin\Exception;
+use Typecho\Plugin\PluginInterface;
+use Typecho\Widget;
+use Typecho\Widget\Helper\Form;
+use Widget\Archive;
+use Widget\Comments\Recent as CommentsRecent;
+use Widget\Contents\Post\Recent as PostRecent;
+use Widget\Options;
+use Widget\User;
+
+if (!defined('__TYPECHO_ROOT_DIR__')) {
+    exit;
+}
+
 /**
  * 首页过滤文章和评论
  *
  * @package Filter
  * @author uy_sun
  * @version 0.1.1
- * @link https://hehome.xyz/
+ * @since 1.2.0
+ * @link https://github.com/he0119/typecho-filter
  */
-class Filter_Plugin implements Typecho_Plugin_Interface
+class Plugin implements PluginInterface
 {
     /**
      * 激活插件方法,如果激活失败,直接抛出异常
      *
      * @access public
      * @return void
-     * @throws Typecho_Plugin_Exception
+     * @throws Exception
      */
     public static function activate()
     {
         # 过滤加密文章
-        Typecho_Plugin::factory('Widget_Archive')->handleInit = array('Filter_Plugin', 'archiveFilter');
+        Archive::pluginHandle()->handleInit = __CLASS__ . '::archiveFilter';
     }
 
     /**
@@ -29,44 +48,48 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      * @static
      * @access public
      * @return void
-     * @throws Typecho_Plugin_Exception
+     * @throws Exception
      */
     public static function deactivate()
-    { }
+    {
+    }
 
     /**
      * 获取插件配置面板
      *
      * @access public
-     * @param Typecho_Widget_Helper_Form $form 配置面板
+     * @param Form $form 配置面板
      * @return void
      */
-    public static function config(Typecho_Widget_Helper_Form $form)
-    { }
+    public static function config(Form $form)
+    {
+    }
 
     /**
      * 个人用户的配置面板
      *
      * @access public
-     * @param Typecho_Widget_Helper_Form $form
+     * @param Form $form
      * @return void
      */
-    public static function personalConfig(Typecho_Widget_Helper_Form $form)
-    { }
+    public static function personalConfig(Form $form)
+    {
+    }
 
     /**
      * 过滤加密文章
      *
      * @access public
-     * @return void
+     * @param object $obj
+     * @param Query $select
+     * @return Query
      */
     public static function archiveFilter($obj, $select)
     {
-        # 获取用户
-        $user = Typecho_Widget::widget('Widget_User');
+        $user = User::alloc();
         if (!$user->pass('editor', true)) {
             // 过滤加密文章
-            $select = $select->where('table.contents.password is null');
+            $select = $select->where('table.contents.password IS NULL');
         }
         return $select;
     }
@@ -75,36 +98,36 @@ class Filter_Plugin implements Typecho_Plugin_Interface
      * 创建定制的最新文章组件
      *
      * @access public
-     * @return array
+     * @return Widget
      */
     public static function recentPosts()
     {
         # 如果插件未激活则使用 Typecho 自带的组件
-        $options = Typecho_Widget::widget('Widget_Options');
-		if (!isset($options->plugins['activated']['Filter'])) {
-			return Typecho_Widget::widget('Widget_Contents_Post_Recent');
-		}
-        return Typecho_Widget::widget('Widget_Contents_Post_Recent_Filter_Plugin');
+        $options = Options::alloc();
+        if (!isset($options->plugins['activated']['Filter'])) {
+            return PostRecent::alloc();
+        }
+        return WidgetContentsPostRecentFilter::alloc();
     }
 
     /**
      * 创建定制的最近回复组件
      *
      * @access public
-     * @return array
+     * @return Widget
      */
     public static function recentComments()
     {
         # 如果插件未激活则使用 Typecho 自带的组件
-        $options = Typecho_Widget::widget('Widget_Options');
+        $options = Options::alloc();
         if (!isset($options->plugins['activated']['Filter'])) {
-			return Typecho_Widget::widget('Widget_Comments_Recent');
-		}
-        return Typecho_Widget::widget('Widget_Comments_Recent_Filter_Plugin');
+            return CommentsRecent::alloc();
+        }
+        return WidgetCommentsRecentFilter::alloc();
     }
 }
 
-class Widget_Comments_Recent_Filter_Plugin extends Widget_Comments_Recent
+class WidgetCommentsRecentFilter extends CommentsRecent
 {
     /**
      * 执行函数
@@ -114,17 +137,15 @@ class Widget_Comments_Recent_Filter_Plugin extends Widget_Comments_Recent
      */
     public function execute()
     {
-        $select  = $this->select()->limit($this->parameter->pageSize)
+        $select = $this->select()->limit($this->parameter->pageSize)
             ->where('table.comments.status = ?', 'approved')
-            ->order('table.comments.coid', Typecho_Db::SORT_DESC);
+            ->order('table.comments.coid', Db::SORT_DESC);
 
-        # 获取用户
-        $user = Typecho_Widget::widget('Widget_User');
-        if (!$user->pass('editor', true)) {
+        if (!$this->user->pass('editor', true)) {
             # 过滤加密文章的评论
-            $select =  $select
-                ->join('table.contents', 'table.comments.cid = table.contents.cid', Typecho_Db::LEFT_JOIN)
-                ->where('table.contents.password is null');
+            $select = $select
+                ->join('table.contents', 'table.comments.cid = table.contents.cid', Db::LEFT_JOIN)
+                ->where('table.contents.password IS NULL');
         }
 
         if ($this->parameter->parentId) {
@@ -140,11 +161,11 @@ class Widget_Comments_Recent_Filter_Plugin extends Widget_Comments_Recent
             $select->where('ownerId <> authorId');
         }
 
-        $this->db->fetchAll($select, array($this, 'push'));
+        $this->db->fetchAll($select, [$this, 'push']);
     }
 }
 
-class Widget_Contents_Post_Recent_Filter_Plugin extends Widget_Contents_Post_Recent
+class WidgetContentsPostRecentFilter extends PostRecent
 {
     /**
      * 执行函数
@@ -154,22 +175,21 @@ class Widget_Contents_Post_Recent_Filter_Plugin extends Widget_Contents_Post_Rec
      */
     public function execute()
     {
-        $this->parameter->setDefault(array('pageSize' => $this->options->postsListSize));
+        $this->parameter->setDefault(['pageSize' => $this->options->postsListSize]);
 
         $select = $this->select()
             ->where('table.contents.status = ?', 'publish')
             ->where('table.contents.created < ?', $this->options->time)
             ->where('table.contents.type = ?', 'post')
-            ->order('table.contents.created', Typecho_Db::SORT_DESC)
+            ->order('table.contents.created', Db::SORT_DESC)
             ->limit($this->parameter->pageSize);
 
         # 获取用户
-        $user = Typecho_Widget::widget('Widget_User');
-        if (!$user->pass('editor', true)) {
+        if (!$this->user->pass('editor', true)) {
             # 过滤加密文章
-            $select =  $select->where('table.contents.password is null');
+            $select = $select->where('table.contents.password IS NULL');
         }
 
-        $this->db->fetchAll($select, array($this, 'push'));
+        $this->db->fetchAll($select, [$this, 'push']);
     }
 }
