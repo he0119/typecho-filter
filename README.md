@@ -1,8 +1,10 @@
-# Typecho Filter
+# Filter
 
-过滤插件
+首页过滤加密文章和评论
 
-## 使用
+## 安装
+
+下载插件，修改文件夹为 Filter，上传到网站插件目录，后台启用。
 
 ```bash
 cd typecho/usr/plugins
