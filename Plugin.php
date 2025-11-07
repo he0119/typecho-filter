@@ -11,6 +11,7 @@ use Typecho\Widget\Helper\Form;
 use Widget\Archive;
 use Widget\Comments\Recent as CommentsRecent;
 use Widget\Contents\Post\Recent as PostRecent;
+use Widget\Metas\Category\Rows;
 use Widget\Options;
 use Widget\User;
 
@@ -40,6 +41,7 @@ class Plugin implements PluginInterface
     {
         # 过滤加密文章
         Archive::pluginHandle()->handleInit = __CLASS__ . '::archiveFilter';
+        Rows::pluginHandle()->listCategories = __CLASS__ . '::listCategories';
     }
 
     /**
@@ -124,6 +126,45 @@ class Plugin implements PluginInterface
             return CommentsRecent::alloc();
         }
         return WidgetCommentsRecentFilter::alloc();
+    }
+
+    /**
+     * treeViewCategories
+     *
+     * @param mixed $categoryOptions 输出选项
+     * @param Rows $rows
+     */
+    public static function listCategories($categoryOptions, $rows)
+    {
+        $rows->stack = $rows->getCategories($rows->top);
+
+        if ($rows->have()) {
+            echo '<' . $rows->categoryOptions->wrapTag . (empty($rows->categoryOptions->wrapClass)
+                ? '' : ' class="' . $rows->categoryOptions->wrapClass . '"') . '>';
+
+            $db = Db::get();
+            while ($rows->next()) {
+                $postsInCategory = $db->fetchAll(
+                    $db->select('password')
+                        ->from('table.contents')
+                        ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                        ->where('table.relationships.mid = ?', $rows->mid)
+                        ->where('table.contents.type = ?', 'post')
+                        ->where('table.contents.status = ?', 'publish')
+                );
+
+                // 如果该分类下没有文章，或所有文章都有密码，则跳过
+                if (
+                    empty($postsInCategory) || !array_filter($postsInCategory, fn($post) => empty($post['password']))
+                ) {
+                    continue;
+                }
+                $rows->treeViewCategoriesCallback();
+            }
+            echo '</' . $rows->categoryOptions->wrapTag . '>';
+        }
+
+        $rows->stack = $rows->map;
     }
 }
 
